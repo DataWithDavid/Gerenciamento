@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Controle de Projetos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Controle de Projetos</h1>
+    </header>
+
+    <main>
+        <section>
+            <h2>Resumo Financeiro</h2>
+            <div class="resumo-item">
+                <span>Total Receitas:</span>
+                <span id="total-receitas">R$ 0,00</span>
+            </div>
+            <div class="resumo-item">
+                <span>Total Despesas:</span>
+                <span id="total-despesas">R$ 0,00</span>
+            </div>
+            <div class="resumo-item">
+                <span>Burn Rate:</span>
+                <span id="burn-rate" class="positive">R$ 0,00</span>
+            </div>
+            <div class="resumo-item">
+                <span>Margem de Lucro:</span>
+                <span id="margem-lucro">R$ 0,00</span>
+            </div>
+        </section>
+
+        <section>
+            <h2>Adicionar Cliente</h2>
+            <form id="form-adicionar-cliente">
+                <input type="text" name="nome" placeholder="Nome do Cliente" required>
+                <input type="text" name="representante" placeholder="Representante" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="text" name="telefone" placeholder="Telefone" required>
+                <input type="number" name="valor" placeholder="Valor do Contrato" step="0.01" required>
+                <input type="number" name="depositado" placeholder="Valor Depositado" step="0.01" required>
+                <button type="submit">Adicionar Cliente</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Adicionar Despesa</h2>
+            <form id="form-adicionar-despesa">
+                <input type="text" name="descricao" placeholder="Descrição" required>
+                <select name="categoria" required>
+                    <option value="Administrativa">Administrativa</option>
+                    <option value="Operacional">Operacional</option>
+                    <option value="Marketing">Marketing</option>
+                </select>
+                <input type="number" name="valor-despesa" placeholder="Valor" step="0.01" required>
+                <input type="date" name="data">
+                <label>
+                    <input type="checkbox" name="indeterminado"> Indeterminado
+                </label>
+                <button type="submit">Adicionar Despesa</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Clientes</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Representante</th>
+                        <th>Email</th>
+                        <th>Telefone</th>
+                        <th>Valor do Contrato</th>
+                        <th>Valor Depositado</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="clientes-tabela"></tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Despesas</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th>Categoria</th>
+                        <th>Valor</th>
+                        <th>Data</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="despesas-tabela"></tbody>
+            </table>
+        </section>
+        <section class="import-export-container">
+            <button id="btn-exportar">Exportar Dados</button>
+            <input type="file" id="file-import" accept="application/json">
+            <button id="btn-importar" onclick="document.getElementById('file-import').click();">Importar Dados</button>
+        </section>
+        
+    </main>
+
+    <script>
+        // Elementos DOM
+        const formAdicionarCliente = document.getElementById('form-adicionar-cliente');
+        const formAdicionarDespesa = document.getElementById('form-adicionar-despesa');
+        const tabelaClientes = document.getElementById('clientes-tabela');
+        const tabelaDespesas = document.getElementById('despesas-tabela');
+        const totalReceitasSpan = document.getElementById('total-receitas');
+        const totalDespesasSpan = document.getElementById('total-despesas');
+        const burnRateSpan = document.getElementById('burn-rate');
+        const margemLucroSpan = document.getElementById('margem-lucro');
+        const btnExportar = document.getElementById('btn-exportar');
+        const fileImport = document.getElementById('file-import');
+        const btnImportar = document.getElementById('btn-importar');
+
+        // Dados em memória
+        let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+        let despesas = JSON.parse(localStorage.getItem('despesas')) || [];
+
+        // Atualizar interface
+        function atualizarInterface() {
+            // Limpar tabelas
+            tabelaClientes.innerHTML = '';
+            tabelaDespesas.innerHTML = '';
+
+            // Renderizar clientes
+            clientes.forEach((cliente, index) => {
+                const valorContrato = cliente.valorContrato || 0;
+                const valorDepositado = cliente.valorDepositado || 0;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${cliente.nome}</td>
+                    <td>${cliente.representante}</td>
+                    <td>${cliente.email}</td>
+                    <td>${cliente.telefone}</td>
+                    <td>R$ ${valorContrato.toFixed(2)}</td>
+                    <td>R$ ${valorDepositado.toFixed(2)}</td>
+                    <td class="acoes">
+                        <button class="btn btn-edit" onclick="editarCliente(${index})">Editar</button>
+                        <button class="btn btn-delete" onclick="excluirCliente(${index})">Excluir</button>
+                    </td>
+                `;
+                tabelaClientes.appendChild(row);
+            });
+
+            // Renderizar despesas
+            despesas.forEach((despesa, index) => {
+                const valor = despesa.valor || 0;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${despesa.descricao}</td>
+                    <td>${despesa.categoria}</td>
+                    <td>R$ ${valor.toFixed(2)}</td>
+                    <td>${despesa.indeterminado ? 'Indeterminado' : despesa.data || ''}</td>
+                    <td class="acoes">
+                        <button class="btn btn-edit" onclick="editarDespesa(${index})">Editar</button>
+                        <button class="btn btn-delete" onclick="excluirDespesa(${index})">Excluir</button>
+                    </td>
+                `;
+                tabelaDespesas.appendChild(row);
+            });
+
+            calcularResumo();
+        }
+
+        // Calcular resumo financeiro
+        function calcularResumo() {
+            const totalReceitas = clientes.reduce((sum, cliente) => sum + (cliente.valorDepositado || 0), 0);
+            const totalDespesas = despesas.reduce((sum, despesa) => sum + (despesa.valor || 0), 0);
+            const burnRate = totalReceitas - totalDespesas;
+            const margemLucro = burnRate;
+
+            totalReceitasSpan.textContent = `R$ ${totalReceitas.toFixed(2)}`;
+            totalDespesasSpan.textContent = `R$ ${totalDespesas.toFixed(2)}`;
+            burnRateSpan.textContent = `R$ ${Math.abs(burnRate).toFixed(2)}`;
+            burnRateSpan.className = burnRate >= 0 ? 'positive' : 'negative';
+            margemLucroSpan.textContent = `R$ ${margemLucro.toFixed(2)}`;
+        }
+
+        // Adicionar cliente
+        formAdicionarCliente.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(formAdicionarCliente);
+            const cliente = {
+                nome: formData.get('nome'),
+                representante: formData.get('representante'),
+                email: formData.get('email'),
+                telefone: formData.get('telefone'),
+                valorContrato: parseFloat(formData.get('valor')) || 0,
+                valorDepositado: parseFloat(formData.get('depositado')) || 0,
+            };
+            clientes.push(cliente);
+            salvarDados();
+            atualizarInterface();
+            formAdicionarCliente.reset();
+        });
+
+        // Adicionar despesa
+        formAdicionarDespesa.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(formAdicionarDespesa);
+            const despesa = {
+                descricao: formData.get('descricao'),
+                categoria: formData.get('categoria'),
+                valor: parseFloat(formData.get('valor-despesa')) || 0,
+                data: formData.get('indeterminado') ? null : formData.get('data'),
+                indeterminado: formData.get('indeterminado') ? true : false,
+            };
+            despesas.push(despesa);
+            salvarDados();
+            atualizarInterface();
+            formAdicionarDespesa.reset();
+        });
+
+        // Editar e excluir funções para clientes e despesas
+        function editarCliente(index) {
+            const cliente = clientes[index];
+            formAdicionarCliente.elements['nome'].value = cliente.nome;
+            formAdicionarCliente.elements['representante'].value = cliente.representante;
+            formAdicionarCliente.elements['email'].value = cliente.email;
+            formAdicionarCliente.elements['telefone'].value = cliente.telefone;
+            formAdicionarCliente.elements['valor'].value = cliente.valorContrato;
+            formAdicionarCliente.elements['depositado'].value = cliente.valorDepositado;
+            excluirCliente(index);
+        }
+
+        function excluirCliente(index) {
+            clientes.splice(index, 1);
+            salvarDados();
+            atualizarInterface();
+        }
+
+        function editarDespesa(index) {
+            const despesa = despesas[index];
+            formAdicionarDespesa.elements['descricao'].value = despesa.descricao;
+            formAdicionarDespesa.elements['categoria'].value = despesa.categoria;
+            formAdicionarDespesa.elements['valor-despesa'].value = despesa.valor;
+            formAdicionarDespesa.elements['data'].value = despesa.data || '';
+            formAdicionarDespesa.elements['indeterminado'].checked = despesa.indeterminado;
+            excluirDespesa(index);
+        }
+
+        function excluirDespesa(index) {
+            despesas.splice(index, 1);
+            salvarDados();
+            atualizarInterface();
+        }
+
+        // Salvar dados no localStorage
+        function salvarDados() {
+            localStorage.setItem('clientes', JSON.stringify(clientes));
+            localStorage.setItem('despesas', JSON.stringify(despesas));
+        }
+                // Exportar dados
+                btnExportar.addEventListener('click', () => {
+            const data = JSON.stringify({ clientes, despesas });
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dados_projetos.json';
+            a.click();
+
+            URL.revokeObjectURL(url);
+        });
+
+        // Importar dados
+        btnImportar.addEventListener('click', () => {
+            fileImport.click();
+        });
+
+        fileImport.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        clientes = importedData.clientes || [];
+                        despesas = importedData.despesas || [];
+                        salvarDados();
+                        atualizarInterface();
+                        alert('Dados importados com sucesso!');
+                    } catch (error) {
+                        alert('Erro ao importar os dados. Verifique o arquivo.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Inicializar interface
+        atualizarInterface();
+    </script>
+</body>
+</html>
+
+</body>
+</html>
